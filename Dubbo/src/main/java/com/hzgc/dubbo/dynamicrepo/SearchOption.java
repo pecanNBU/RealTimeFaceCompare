@@ -61,24 +61,11 @@ public class SearchOption implements Serializable {
      * 分页查询开始行
      */
     private int offset;
-    /**
-     * 查询条数
-     */
-    private int count;
-
-    /**
-     * 分页查询开始行
-     */
-    private int offset;
 
     /**
      * 查询条数
      */
     private int count;
-
-    public int getOffset() { return offset; }
-
-    public void setOffset(int offset) { this.offset = offset; }
 
     public int getCount() { return count; }
 
@@ -192,13 +179,6 @@ public class SearchOption implements Serializable {
         this.offset = offset;
     }
 
-    public int getCount() {
-        return count;
-    }
-
-    public void setCount(int count) {
-        this.count = count;
-    }
 
     @Override
     public String toString() {

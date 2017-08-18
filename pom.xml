@@ -19,6 +19,7 @@
         <module>JNI</module>
         <module>HBase2Es</module>
         <module>Util</module>
+        <module>ElasticSearch</module>
     </modules>
 
     <properties>
@@ -83,6 +84,7 @@
                 <version>4.12</version>
                 <scope>test</scope>
             </dependency>
+            <!--显示定义，用来解决jar包冲突-->
             <dependency>
                 <groupId>org.apache.logging.log4j</groupId>
                 <artifactId>log4j-api</artifactId>

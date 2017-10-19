@@ -52,6 +52,7 @@ public class WorkerThread implements Runnable, Serializable {
         LOG.info("Create [" + Thread.currentThread().getName() + "] of PicWorkerThreads success");
     }
 
+    @Override
     public void run() {
         send();
     }
@@ -63,10 +64,10 @@ public class WorkerThread implements Runnable, Serializable {
             }
             while (true) {
                 ConsumerRecord<String, byte[]> consumerRecord = buffer.take();
-                picTable = hbaseConn.getTable(TableName.valueOf(tableName));
+                // TODO: 2017-10-11 避免hbase频繁连接导致开销太大 
+                //picTable = hbaseConn.getTable(TableName.valueOf(tableName));
                 if (null != columnFamily && null != column_pic && null != consumerRecord) {
                     Put put = new Put(Bytes.toBytes(consumerRecord.key()));
-
                     put.setDurability(Durability.SYNC_WAL);
                     put.addColumn(Bytes.toBytes(columnFamily), Bytes.toBytes(column_pic), consumerRecord.value());
                     Map<String, String> map = FtpUtil.getRowKeyMessage(consumerRecord.key());

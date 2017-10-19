@@ -5,6 +5,7 @@ import java.util.Date
 import com.google.gson.Gson
 import com.hzgc.ftpserver.util.FtpUtil
 import com.hzgc.hbase.device.{DeviceTable, DeviceUtilImpl}
+import com.hzgc.hbase.dynamicrepo.{CapturePictureSearchServiceImpl, GetPicture}
 import com.hzgc.hbase.staticrepo.ObjectInfoInnerHandlerImpl
 import com.hzgc.jni.FaceFunction
 import com.hzgc.rocketmq.util.RocketMQProducer
@@ -28,6 +29,7 @@ object FaceAddAlarmJob {
 
   def main(args: Array[String]): Unit = {
     val deviceUtilI = new DeviceUtilImpl()
+    val gp = new GetPicture()
     val properties = StreamingUtils.getProperties
     val appName = properties.getProperty("job.addAlarm.appName")
     val master = properties.getProperty("job.addAlarm.master")
@@ -86,6 +88,7 @@ object FaceAddAlarmJob {
         parRDD.foreach(result => {
           //识别集合为null，对该条数据进行新增告警。
           if (result._4 == null || result._4.isEmpty) {
+<<<<<<< HEAD
             val dateStr = df.format(new Date())
             val addAlarmMessage = new AddAlarmMessage()
             addAlarmMessage.setAlarmTime(dateStr)
@@ -98,7 +101,23 @@ object FaceAddAlarmJob {
               result._1,
               gson.toJson(addAlarmMessage).getBytes(),
               null)
+=======
+            val flag = gp.getCapture(result._1)
+            if (flag != null) {
+>>>>>>> v1.0.0
 
+              val dateStr = df.format(new Date())
+              val addAlarmMessage = new AddAlarmMessage()
+              addAlarmMessage.setAlarmTime(dateStr)
+              addAlarmMessage.setAlarmType(DeviceTable.ADDED.toString)
+              addAlarmMessage.setDynamicID(result._1)
+              addAlarmMessage.setDynamicDeviceID(result._2)
+              rocketMQProducer.send(result._3,
+                "alarm_" + DeviceTable.ADDED.toString,
+                result._1,
+                gson.toJson(addAlarmMessage).getBytes(),
+                null)
+            }
           }
         })
       })

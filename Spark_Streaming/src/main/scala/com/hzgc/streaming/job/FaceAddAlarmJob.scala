@@ -88,7 +88,6 @@ object FaceAddAlarmJob {
         parRDD.foreach(result => {
           //识别集合为null，对该条数据进行新增告警。
           if (result._4 == null || result._4.isEmpty) {
-<<<<<<< HEAD
             val dateStr = df.format(new Date())
             val addAlarmMessage = new AddAlarmMessage()
             addAlarmMessage.setAlarmTime(dateStr)
@@ -101,10 +100,8 @@ object FaceAddAlarmJob {
               result._1,
               gson.toJson(addAlarmMessage).getBytes(),
               null)
-=======
             val flag = gp.getCapture(result._1)
             if (flag != null) {
->>>>>>> v1.0.0
 
               val dateStr = df.format(new Date())
               val addAlarmMessage = new AddAlarmMessage()

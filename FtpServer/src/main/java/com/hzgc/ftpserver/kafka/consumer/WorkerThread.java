@@ -64,7 +64,6 @@ public class WorkerThread implements Runnable, Serializable {
             }
             while (true) {
                 ConsumerRecord<String, byte[]> consumerRecord = buffer.take();
-                // TODO: 2017-10-11 避免hbase频繁连接导致开销太大 
                 //picTable = hbaseConn.getTable(TableName.valueOf(tableName));
                 if (null != columnFamily && null != column_pic && null != consumerRecord) {
                     Put put = new Put(Bytes.toBytes(consumerRecord.key()));

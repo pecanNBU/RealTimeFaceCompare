@@ -22,6 +22,7 @@ public enum Hat implements Serializable{
         this.hatvalue = hatvalue;
     }
 
+    @Override
     public String toString() {
         return "HatValue{" + "value=" + hatvalue + '}';
     }

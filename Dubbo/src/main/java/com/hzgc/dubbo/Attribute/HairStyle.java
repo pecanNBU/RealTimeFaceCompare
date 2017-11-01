@@ -22,6 +22,7 @@ public enum HairStyle implements Serializable{
         this.hairstylevalue = hairstylevalue;
     }
 
+    @Override
     public String toString() {
         return "HairStyle{" + "style=" + hairstylevalue + '}';
     }

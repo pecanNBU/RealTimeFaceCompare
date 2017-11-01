@@ -22,6 +22,7 @@ public enum Tie implements Serializable{
         this.tievalue = tievalue;
     }
 
+    @Override
     public String toString() {
         return "TieValue{" + "value=" + tievalue + '}';
     }

@@ -59,6 +59,56 @@ public class ListUtils {
         return sortParam;
     }
 
+
+    /**
+     * 根据排序string来生成sql排序，多个排序字段用逗号隔开。'+'表示升序，'-'表示降序，如+id,-name
+     *
+     * @param sortParams 排序字符串
+     * @return SortParam 排序入参对象
+     */
+    public static String getOrderStringBySort1(String sortParams) {
+        //SortParam sortParam = new SortParam();
+        StringBuilder orderString = new StringBuilder();
+        if (null != sortParams && sortParams.length() > 0) {
+            String[] orderStringList = sortParams.split(",");
+            for (String s : orderStringList) {
+                char orderTypeChar = s.charAt(0);
+                // 降序
+                if ("-".toCharArray()[0] == orderTypeChar) {
+                    orderString.append(s.substring(1));
+                    orderString.append(" ");
+                    orderString.append("DESC");
+                }
+                // 升序
+                else {
+                    orderString.append(s.substring(1));
+                    orderString.append(" ");
+                    orderString.append("ASC");
+                }
+                if (!s.equals(orderStringList[orderStringList.length - 1])) {
+                    orderString.append(",");
+                }
+            }
+
+            /*String[] splitStr = orderString.toString().split(",");
+            String[] sortNameArr = new String[splitStr.length];
+            boolean[] isAscArr = new boolean[splitStr.length];
+            for (int i = 0; i < splitStr.length; i++) {
+                String[] oneParam = splitStr[i].split(" ");
+                sortNameArr[i] = oneParam[0];
+                isAscArr[i] = oneParam[1].equals("DESC");
+            }
+            sortParam.setSortNameArr(sortNameArr);
+            sortParam.setIsAscArr(isAscArr);*/
+        } else {
+            LOG.info("sortParam is null");
+            //sortParam = null;
+        }
+        return orderString.toString();
+    }
+
+
+
     /*
      * 对list的元素按照多个属性名称排序,
      * list元素的属性可以是数字（byte、short、int、long、float、double等，支持正数、负数、0）、char、String、java.util.Date

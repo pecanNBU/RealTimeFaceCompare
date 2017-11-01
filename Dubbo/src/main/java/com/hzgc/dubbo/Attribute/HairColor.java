@@ -23,6 +23,7 @@ public enum HairColor implements Serializable{
         this.haircolorvalue = haircolorvalue;
     }
 
+    @Override
     public String toString() {
         return "HairColor{" + "color=" + haircolorvalue + '}';
     }

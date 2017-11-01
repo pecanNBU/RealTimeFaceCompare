@@ -22,6 +22,7 @@ public enum Huzi implements Serializable{
         this.huzivalue = huzivalue;
     }
 
+    @Override
     public String toString() {
         return "HuziValue{" + "value=" + huzivalue + '}';
     }

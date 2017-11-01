@@ -22,6 +22,7 @@ public enum Eyeglasses implements Serializable{
         this.eyeglassesvalue = eyeglassesvalue;
     }
 
+    @Override
     public String toString() {
         return "EyeglassesValue{" + "value=" + eyeglassesvalue + '}';
     }

@@ -33,3 +33,7 @@ HBase/src/test/java/com/hzgc/hbase/consumer/
 *.xml
 /FtpServer/src/main/resources/producer-over-ftp.properties
 /FtpServer/src/main/resources/ftpAddress.properties
+/HBase/src/main/java/com/hzgc/hbase/dynamicrepo/RealTimeCompareBySparkSQL.java
+/Util/src/main/java/com.hzgc.util/jdbc/
+/Util/src/main/resources/
+/Util/pom.xml

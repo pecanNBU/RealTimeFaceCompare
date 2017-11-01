@@ -16,7 +16,6 @@ public class FtpUtil implements Serializable {
     public static boolean checkPort(int checkPort) throws Exception {
         return checkPort > 1024;
     }
-
     public static ByteArrayOutputStream inputStreamCacher(InputStream is) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         byte[] buffer = new byte[4096];

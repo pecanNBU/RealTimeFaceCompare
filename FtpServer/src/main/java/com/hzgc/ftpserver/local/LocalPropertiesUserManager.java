@@ -133,6 +133,7 @@ public class LocalPropertiesUserManager extends AbstractUserManager implements S
         return userDataFile;
     }
 
+    @Override
     public synchronized void save(User usr) throws FtpException {
         // null value check
         if (usr.getName() == null) {
@@ -212,6 +213,7 @@ public class LocalPropertiesUserManager extends AbstractUserManager implements S
         }
     }
 
+    @Override
     public void delete(String usrName) throws FtpException {
         // remove entries from properties
         String thisPrefix = PREFIX + usrName + '.';
@@ -250,6 +252,7 @@ public class LocalPropertiesUserManager extends AbstractUserManager implements S
         return password;
     }
 
+    @Override
     public String[] getAllUserNames() {
         // get all user names
         String suffix = '.' + ATTR_HOME;
@@ -271,6 +274,7 @@ public class LocalPropertiesUserManager extends AbstractUserManager implements S
         return ulst.toArray(new String[0]);
     }
 
+    @Override
     public User getUserByName(String userName) {
         if (!doesExist(userName)) {
             return null;
@@ -311,11 +315,13 @@ public class LocalPropertiesUserManager extends AbstractUserManager implements S
         return user;
     }
 
+    @Override
     public boolean doesExist(String name) {
         String key = PREFIX + name + '.' + ATTR_HOME;
         return userDataProp.containsKey(key);
     }
 
+    @Override
     public User authenticate(Authentication authentication)
             throws AuthenticationFailedException {
         if (authentication instanceof UsernamePasswordAuthentication) {

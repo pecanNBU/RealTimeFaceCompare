@@ -20,9 +20,4 @@ public class FaceObjectDecoder implements org.apache.kafka.common.serialization.
     public void close() {
 
     }
-
-   /* @Override
-    public FaceObject fromBytes(byte[] bytes) {
-        return BeanUtils.bytesToObject(bytes);
-    }*/
 }

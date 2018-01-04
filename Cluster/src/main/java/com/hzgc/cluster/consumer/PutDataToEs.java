@@ -1,14 +1,17 @@
 package com.hzgc.cluster.consumer;
 
+import com.hzgc.dubbo.feature.FaceAttribute;
 import com.hzgc.ftpserver.producer.FaceObject;
 import com.hzgc.service.dynamicrepo.DynamicTable;
 import com.hzgc.service.staticrepo.ElasticSearchHelper;
-import com.hzgc.dubbo.feature.FaceAttribute;
 import org.elasticsearch.action.index.IndexResponse;
 
 import java.io.Serializable;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.TimeZone;
 
 public class PutDataToEs implements Serializable {
     private static PutDataToEs instance = null;
@@ -26,6 +29,16 @@ public class PutDataToEs implements Serializable {
 
     public int putDataToEs(String ftpurl, FaceObject faceObject) {
         String timestamp = faceObject.getTimeStamp();
+        //日期时间转化，添加时区字段
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        SimpleDateFormat sdf1 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSZ");
+        sdf1.setTimeZone(TimeZone.getTimeZone("Asia/Shanghai"));
+        try {
+            java.util.Date timeStampDate = sdf.parse(timestamp);
+            timestamp = sdf1.format(timeStampDate);
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
         String ipcid = faceObject.getIpcId();
         String timeslot = faceObject.getTimeSlot();
         String date = faceObject.getDate();

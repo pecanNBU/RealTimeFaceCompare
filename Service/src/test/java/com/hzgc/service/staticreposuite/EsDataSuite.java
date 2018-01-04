@@ -16,27 +16,37 @@ import org.elasticsearch.search.sort.SortOrder;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.TimeZone;
+import java.util.UUID;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 
 public class EsDataSuite {
     @Test
     public void testPutFloatArrayToEs() throws IOException {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSZ");
+        sdf.setTimeZone(TimeZone.getTimeZone("Asia/Shanghai"));
         Client client = ElasticSearchHelper.getEsClient();
-        IndexResponse response = client.prepareIndex("twitter", "tweet", "1000")
-                .setSource(jsonBuilder()
-                        .startObject()
-                        .field("user", "enhaye")
-                        .field("postDate", new float[]{1.23411321341f, 1.09f, 2.3454f, 1.0939309f})
-                        .endObject()).get();
+        for (int i = 0; i < 100; i++) {
+            String uuid = UUID.randomUUID().toString();
+            IndexResponse response = client.prepareIndex("dynamic-v2", "person", uuid)
+                    .setSource(jsonBuilder()
+                            .startObject()
+                            .field("exacttime", sdf.format(new Date()))
+                            .field("ipcid", "test")
+                            .endObject()).get();
 
-        String _index = response.getIndex();
-        String _type = response.getType();
-        String _id = response.getId();
-        long _version = response.getVersion();
-        RestStatus status = response.status();
-        System.out.println("_index: " + _index + ", _type: " + _type + ", _id： "
-                + _id + "_version: " + _version + "status: " + status);
+            String _index = response.getIndex();
+            String _type = response.getType();
+            String _id = response.getId();
+            long _version = response.getVersion();
+            RestStatus status = response.status();
+            System.out.println("_index: " + _index + ", _type: " + _type + ", _id： "
+                    + _id + "_version: " + _version + "status: " + status);
+        }
+
     }
 
     @Test

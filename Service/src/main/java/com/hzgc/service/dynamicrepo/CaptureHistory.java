@@ -14,7 +14,8 @@ import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.sort.SortOrder;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 class CaptureHistory {
     private static Logger LOG = Logger.getLogger(CaptureHistory.class);
@@ -67,10 +68,10 @@ class CaptureHistory {
         if (SearchType.PERSON.equals(searchType)) {
             // 获取设备ID
             List<String> deviceId = option.getDeviceIds();
-            // 起始时间
-            String startTime = option.getStartDate();
+            // 起始时间，强制添加时区字段
+            String startTime = option.getStartDate() + ".000+0800";
             // 结束时间
-            String endTime = option.getEndDate();
+            String endTime = option.getEndDate() + ".000+0800";
             // 时间段
             List<TimeInterval> timeIntervals = option.getIntervals();
             //人脸属性
@@ -96,7 +97,8 @@ class CaptureHistory {
             // 设备ID 存在的时候的处理
             if (deviceId != null) {
                 for (Object t : deviceId) {
-                    devicdIdBQ.should(QueryBuilders.matchPhraseQuery(DynamicTable.IPCID, t).analyzer("standard"));
+                    //matchQuery 修改为termQuery
+                    devicdIdBQ.should(QueryBuilders.termQuery(DynamicTable.IPCID, t));
                 }
                 totalBQ.must(devicdIdBQ);
             }

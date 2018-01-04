@@ -1,3 +1,5 @@
+package demo;
+
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -22,6 +24,10 @@ public class ThreadPoolTest {
 
 class ThreadPoolDemo implements Runnable {
     public void run() {
-        UpDataToFtp.upDataTest("e:/test1", 1, "test");
+        //第一级目录为随机
+        UpDataToFtp.upDataTestFirst("E:/test60", 100, "");
+        //最后一级目录为随机
+//        UpDataToFtp.upDataTestEnd("E:/test60", 100, "");
+
     }
 }

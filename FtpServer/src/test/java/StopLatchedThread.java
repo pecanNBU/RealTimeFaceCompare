@@ -12,7 +12,7 @@ public class StopLatchedThread extends Thread {
 
     public void run() {
         try {
-            UpDataToFtp.upDataTest("e:/test1", 1, "test");
+            UpDataToFtp.upDataTest("e:/testimage", 1, "test");
         } finally {
             stopLatch.countDown();
         }
@@ -22,7 +22,7 @@ public class StopLatchedThread extends Thread {
         //机器可用核数
         int cores = Runtime.getRuntime().availableProcessors();
         CountDownLatch cdl = new CountDownLatch(cores);
-        for (int i = 0; i < cores; i++) {
+        for (int i = 0; i < 10; i++) {
             Thread t = new StopLatchedThread(cdl);
             t.start();
         }

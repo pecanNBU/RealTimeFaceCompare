@@ -348,6 +348,9 @@ public class Download {
         try {
             FileInputStream in = new FileInputStream(new File(orginfilename));
             boolean flag = uploadFile(hostname, port, username, password, basepath, filepath, filename, in);
+            if (!flag) {
+                System.out.println("******************************************************************");
+            }
             //System.out.println(flag);
         } catch (Exception e) {
             e.printStackTrace();

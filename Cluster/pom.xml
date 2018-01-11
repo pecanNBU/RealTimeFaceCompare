@@ -104,6 +104,11 @@
             <artifactId>kafka_2.11</artifactId>
             <version>0.8.2.1</version>
         </dependency>
+        <dependency>
+            <groupId>com.amazonaws</groupId>
+            <artifactId>aws-java-sdk-s3</artifactId>
+            <version>1.11.261</version>
+        </dependency>
     </dependencies>
     <build>
         <resources>

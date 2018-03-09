@@ -1,20 +1,18 @@
 package com.hzgc.cluster.clustering
 
 import java.sql.Timestamp
+import java.text.SimpleDateFormat
 import java.util
-import java.util.{Calendar, Properties}
+import java.util.{Calendar, Date, Properties}
 
-import com.hzgc.cluster.clutering.ClusteringRaw
+import breeze.linalg.Transpose
+import com.hzgc.cluster.consumer.PutDataToEs
 import com.hzgc.cluster.util.PropertiesUtils
 import com.hzgc.dubbo.clustering.ClusteringAttribute
 import org.apache.log4j.Logger
-import org.apache.spark.mllib.clustering.KMeans
-import org.apache.spark.mllib.linalg
 import org.apache.spark.mllib.linalg.Vectors
-import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{Encoders, SparkSession}
-import org.apache.spark.sql.catalyst.encoders.RowEncoder
-import org.apache.spark.storage.StorageLevel
+import org.apache.spark.mllib.linalg.distributed.{CoordinateMatrix, IndexedRow, IndexedRowMatrix}
+import org.apache.spark.sql.SparkSession
 
 import scala.collection.mutable
 
@@ -26,7 +24,7 @@ object ClusteringNew {
 
   val LOG: Logger = Logger.getLogger(KMeansClustering.getClass)
   val threshold: Double = 0.9
-  val timeCount: Int = 15
+  val timeCount: Int = 30
   val repetitionRate: Double = 0.4
 
 
@@ -49,7 +47,8 @@ object ClusteringNew {
     val bpicField = properties.getProperty("job.clustering.mysql.field.bpic")
     val partitionNum = properties.getProperty("job.clustering.partiton.number").toInt
 
-    val spark = SparkSession.builder().appName(appName).enableHiveSupport().master("local[*]").getOrCreate()
+    //val spark = SparkSession.builder().appName(appName).enableHiveSupport().master("local[*]").getOrCreate()
+    val spark = SparkSession.builder().appName(appName).enableHiveSupport().getOrCreate()
     import spark.implicits._
 
     val calendar = Calendar.getInstance()
@@ -66,84 +65,92 @@ object ClusteringNew {
       Data(data.getAs[Long](idField), data.getAs[Timestamp](timeField), data.getAs[String](spicField).substring(1, data.getAs[String](spicField).indexOf("/", 1)), data.getAs[String](hostField), "ftp://" + data.getAs[String](hostField) + ":2121" + data.getAs[String](spicField), "ftp://" + data.getAs[String](hostField) + ":2121" + data.getAs[String](bpicField))
     }).createOrReplaceTempView("mysqlTable")
 
-    val joinData = spark.sql("select T1.feature, T2.* from parquetTable as T1 inner join mysqlTable as T2 on T1.ftpurl=T2.spic")
+    val joinData = spark.sql("select T1.feature, T2.* from parquetTable as T1 inner join mysqlTable as T2 on T1.ftpurl=T2.spic").repartition(40)
     //get the url and feature
-    val idPointDS = joinData.map(data => (data.getAs[String]("spic"), data.getAs[mutable.WrappedArray[Float]]("feature").toArray
-      .map(_.toDouble))).persist(StorageLevel.MEMORY_AND_DISK_SER)
+    val idPointDS = joinData.map(data => (data.getAs[String]("spic"),data.getAs[mutable.WrappedArray[Float]]("feature").toArray
+      .map(_.toDouble)))
+    // TODO:
+    val idPointDS2 = joinData.map(data => (data.getAs[String]("spic"),Vectors.dense(
+      data.getAs[mutable.WrappedArray[Float]]("feature").toArray
+      .map(_.toDouble))))
     //zipwithIndex for decrease the computer cost
-    val zipIdPointDs = idPointDS.sample(false, 0.2).rdd.zipWithIndex()
+    val zipIdPointDs = idPointDS.rdd.zipWithIndex()
     val joined = zipIdPointDs.cartesian(zipIdPointDs)
     val dataPairs = joined.filter(f => f._1._2 < f._2._2)
 
     //calculate the cosine similarity of each two data
-    val pairSimilarity = dataPairs.map(data => (data._1._2, data._2._2, cosineMeasure(data._1._1._2, data._2._1._2)))
-
+    val pairSimilarity = dataPairs.map(data => {
+      (data._1._1._1, data._2._1._1, cosineMeasure(data._1._1._2, data._2._1._2))
+    })
     //filter by the similarity
-    val filterSimilarity = pairSimilarity.filter(_._3 > threshold).map(data => (data._1.toString, data._2.toString))
+    val filterSimilarity = pairSimilarity.filter(_._3 > threshold)
 
     //count each clutering data number,the first image crashed
-    val furlGroup = filterSimilarity.reduceByKey((a, b) => (a + "," + b))
+    val furlGroup = filterSimilarity.map(data => (data._1, data._2)).reduceByKey((a, b) => a + "," + b)
     val numPerUrl = furlGroup.map(data => {
-      val key = data._1
       val valList = data._2.split(",").toList
-      (key, valList, valList.size)
-    })
-    val numFilter = numPerUrl.filter(_._3 > timeCount)
+      println(valList)
+      (data._1, valList, valList.size)
+    }).filter(_._3 > timeCount)
 
-    //merge two list
-    val joinNumFliter = numFilter.zipWithIndex().cartesian(numFilter.zipWithIndex()).filter(f => f._1._2 < f._2._2)
-    val unionData = joinNumFliter.map(data => (data._1._1._1, data._2._1._1, data._1._1._2, data._2._1._2, dataSetSimilarity(data._1._1._2, data._2._1._2))).filter(data => data._5 > repetitionRate)
+    //calculate the similarity of two
+    val numPerUrlZip = numPerUrl.zipWithIndex()
+    val joinNumFliter = numPerUrlZip.cartesian(numPerUrlZip).filter(f => f._1._2 < f._2._2)
+    val unionData = joinNumFliter.map(data =>
+      (data._1._1._1, data._2._1._1, data._1._1._2, data._2._1._2, dataSetSimilarity(data._1._1._2, data._2._1._2)))
+      .filter(data => data._5 > repetitionRate)
+
     val lastData = unionData.map(data => {
-      val key = data._1
       val unionList = data._3.union(data._4).distinct
-      (key, unionList, unionList.size)
-    })
-    lastData.toDF().show(false)
-    /* val urlWithNum = furlGroup.zip(numFilter).map(data => (data._2._1, data._1._2))*/
+      (data._1, unionList)
+    }).groupBy(key=>key._1).foreach(println(_))
 
-    /*val dataPairs = joined.filter(f => f._1._2 < f._2._2)
-
-    //calculate the cosine similarity of each two data
-    val pairSimilarity = dataPairs.map(data => (data._1._1._1, data._2._1._1, cosineMeasure(data._1._1._2, data._2._1._2)))
-
-    //filter by the similarity
-    val filterSimilarity = pairSimilarity.filter(_._3 > threshold).map(data => (data._1, data._2))
-
-    //count each clutering data number,the first image crashed
-    val furlGroup = filterSimilarity.reduceByKey((a, b) => a + "," + b)
-    val numPerUrl = furlGroup.map(data => {
-      val key = data._1
-      val valList = data._2.split(",").toList
-      (key, valList, valList.size)
-    })
-    val numFilter = numPerUrl.filter(_._3 > timeCount)
-
-    //merge two list
-    val joinNumFliter = numFilter.zipWithIndex().cartesian(numFilter.zipWithIndex()).filter(f => f._1._2 < f._2._2)
-    val unionData = joinNumFliter.map(data => (data._1._1._1,data._2._1._1, data._1._1._2,data._2._1._2, dataSetSimilarity(data._1._1._2, data._2._1._2))).filter(data => data._5 > repetitionRate)
-    val lastData = unionData.map(data => {
-      val key = data._1
-      val unionList = data._3.union(data._4).distinct
-      (key, unionList, unionList.size)
-    }).foreach(println(_))
-
-    val urlWithNum = furlGroup.zip(numFilter).map(data => (data._2._1, data._1._2))
-*/
-    //val joinRDD = idPointRDD cartesian idPointRDD
-    /*val joinDF = idPointDS.toDF().crossJoin(idPointDS.toDF())
-    val simDF = joinDF.map(data =>
-      (data.getAs[String](0), data.getAs[String](2), cosineMeasure(data.getAs[mutable.WrappedArray[Float]](1), data.getAs[mutable.WrappedArray[Float]](3)))
-    )
-    // TODO: filter threshold
-    //val simDF1 = simDF.filter(_._3 > threshold).filter(data => (data._1 != data._2)).groupBy("_1").count().filter(data=>(data.getAs[Double](1)>50))
-    val simDF1 = simDF.filter(_._3 > threshold).filter(data => (data._1 != data._2))
-    // TODO:
-    simDF1.rdd.groupBy(key => key._1).flatMap(x => x._2.toList).take(10)
-*/
-    //val simDF2 = simDF1.groupBy("_1").count().filter(data=>(data.getAs("count").asInstanceOf[Long]>50)).show(50,false)
-    //simDF1.join(simDF2,"_1").show(100,false)
-    //val avg_count = spark.sql("select avg(count) from temp")
-
+    /*val mon = calendar.get(Calendar.MONTH)
+    //+1
+    var monStr = ""
+    if (mon < 10) {
+      monStr = "0" + mon
+    } else {
+      monStr = String.valueOf(mon)
+    }
+    val yearMon = calendar.get(Calendar.YEAR) + "-" + monStr
+    val clusteringRowKey = yearMon + "region"
+    var i = 0
+    val viewData = joinData.select("id", "time", "ipc", "host", "spic", "bpic")
+    val table1List = new util.ArrayList[ClusteringAttribute]()
+    numPerUrl.map(data => {
+      val clusteringAttribute = new ClusteringAttribute
+      clusteringAttribute.setClusteringId(i.toString)
+      clusteringAttribute.setCount(data._3)
+      clusteringAttribute.setFtpUrl(data._1)
+      val dataListDF = spark.sparkContext.makeRDD(data._2).toDF()
+      dataListDF.printSchema()
+      val fullInfoDf = dataListDF.join(viewData, dataListDF("_1") === viewData("spic"))
+      val orderData = fullInfoDf.orderBy(fullInfoDf("time"))
+      val idList = new util.ArrayList[Integer]()
+      val rowKey = clusteringRowKey + i
+      val putDataToEs = PutDataToEs.getInstance()
+      val sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+      orderData.foreach(
+        data => {
+          val date = new Date(data.getAs[Timestamp]("time").getTime)
+          val dateNew = sdf.format(date)
+          val status = putDataToEs.upDateDataToEs(data.getAs[String]("spic"), rowKey, dateNew, data.getAs[Long]("id").toInt)
+          if (status != 200) {
+            LOG.info("Put data to es failed! And the failed ftpurl is " + data.getAs("spic"))
+          }
+        }
+      )
+      val first = orderData.first()
+      val last = orderData.orderBy(-orderData("time")).first()
+      clusteringAttribute.setFirstAppearTime(first.getAs("time").toString)
+      clusteringAttribute.setFirstIpcId(first.getAs("ipc"))
+      clusteringAttribute.setLastAppearTime(last.getAs("time").toString)
+      clusteringAttribute.setLastIpcId(last.getAs("ipc"))
+      i += 1
+      clusteringAttribute
+    }).foreach(data => table1List.add(data))
+    PutDataToHBase.putClusteringInfo(clusteringRowKey, table1List)*/
     spark.stop()
   }
 
@@ -165,10 +172,11 @@ object ClusteringNew {
   }
 
   def dataSetSimilarity(list1: List[String], list2: List[String]): Double = {
+    //union size of two list
     val union = List.concat(list1, list2).distinct.size
+    //intersect size of two list
     val intersect = list1.intersect(list2).size
     val minSize = if (list1.size < list2.size) list1.size else list2.size
     intersect / minSize
   }
-
 }

@@ -11,8 +11,7 @@ public class ClusteringTable {
     //clusteringInfo表列簇
     public static final byte[] ClUSTERINGINFO_COLUMNFAMILY = Bytes.toBytes("c");
     //聚类信息
-    public static final byte[] ClUSTERINGINFO_COLUMN_YES = Bytes.toBytes("y");
-    public static final byte[] ClUSTERINGINFO_COLUMN_NO = Bytes.toBytes("n");
+    public static final byte[] ClUSTERINGINFO_COLUMN_DATA = Bytes.toBytes("i");
     //detailInfo表
     public static final String TABLE_DETAILINFO = "detailInfo";
     //detailInfo表列簇

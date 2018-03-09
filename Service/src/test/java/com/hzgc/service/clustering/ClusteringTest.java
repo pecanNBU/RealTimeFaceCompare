@@ -12,9 +12,7 @@ import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import java.io.IOException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.List;
 
 /**
@@ -41,43 +39,41 @@ public class ClusteringTest {
         putDataToHBase(rowkey, clusteringAttributeList);
         getDataFromHBase("2018-06");*/
 
-        /*ClusteringSearchServiceImpl clusteringSearchService = new ClusteringSearchServiceImpl();
-        ClusteringInfo clusteringInfo = clusteringSearchService.clusteringSearch("2018-02", 0, 50, "");
+        ClusteringSearchServiceImpl clusteringSearchService = new ClusteringSearchServiceImpl();
+        ClusteringInfo clusteringInfo = clusteringSearchService.clusteringSearch("2018-02", 0, 50, null);
         System.out.println(clusteringInfo.getTotalClustering());
         List<ClusteringAttribute> clusteringAttributeList = clusteringInfo.getClusteringAttributeList();
         System.out.println(clusteringAttributeList.get(0).getCount());
-        System.out.println(clusteringAttributeList.get(0).getClusteringId());*/
+        System.out.println(clusteringAttributeList.get(0).getClusteringId());
 
 
-       /* List<Integer> blist = new java.util.ArrayList<>();
+        List<Integer> blist = new java.util.ArrayList<>();
         blist.add(1);
-        blist.add(2);
-        blist.add(4);
-        blist.add(7);
-        blist.add(9);
         blist.add(10);
-        blist.add(11);
-        blist.add(12);
         blist.add(13);
+        blist.add(14);
+        blist.add(16);
+        blist.add(17);
+        blist.add(22);
+        blist.add(27);
+        blist.add(29);
         List<ClusteringAttribute> clusteringAttributeList2 = new ArrayList<>();
-        for (int i = 0; i < clusteringAttributeList1.size(); i++) {
+        for (int i = 0; i < clusteringAttributeList.size(); i++) {
             if (blist.contains(i)){
-                clusteringAttributeList2.add(clusteringAttributeList1.get(i));
+                clusteringAttributeList2.add(clusteringAttributeList.get(i));
             }
         }
-        List<ClusteringAttribute> clusteringAttributeList2 = new ArrayList<>();
+        putDataToHBase("2018-02", clusteringAttributeList2);
+       /* List<ClusteringAttribute> clusteringAttributeList2 = new ArrayList<>();
         clusteringAttributeList2.addAll(clusteringAttributeList1);
-        putDataToHBase("2018-02-bak", clusteringAttributeList2);*/
-        ClusteringSearchServiceImpl clusteringSearchService = new ClusteringSearchServiceImpl();
+        putDataToHBase("2018-02", clusteringAttributeList2);*/
+        /*ClusteringSearchServiceImpl clusteringSearchService = new ClusteringSearchServiceImpl();
+
         List<Integer> list = new ArrayList<>();
-        list = clusteringSearchService.detailClusteringSearch_v1("49", "2018-02", 0, 50, "");
+        list = clusteringSearchService.detailClusteringSearch_v1("1", "2018-02", 0, 50, "");
         for (Integer alarmId : list) {
             System.out.println(alarmId);
-        }
-        Calendar c = Calendar.getInstance();
-        c.add(Calendar.MONTH, -1);
-        SimpleDateFormat format =  new SimpleDateFormat("yyyy-MM");
-        String time = format.format(c.getTime());
+        }*/
     }
 
     private static void putDataToHBase(String rowKey, List<ClusteringAttribute> clusteringAttributeList) {

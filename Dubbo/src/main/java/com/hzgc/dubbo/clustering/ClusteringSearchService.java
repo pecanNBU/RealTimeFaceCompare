@@ -16,7 +16,7 @@ public interface ClusteringSearchService {
      * @param sortParam 排序参数（默认按出现次数排序）
      * @return 满足起始条件的聚类列表和聚类总数组成的对象ClusterInfo
      */
-    ClusteringInfo clusteringSearch(String region, String time, int start, int limit, String sortParam);
+    ClusteringInfo clusteringSearch(String time, int start, int limit, String sortParam);
 
     /**
      * 查询单个聚类详细信息(告警记录)
@@ -42,18 +42,4 @@ public interface ClusteringSearchService {
      */
     List<Integer> detailClusteringSearch_v1(String clusterId, String time, int start, int limit, String sortParam);
 
-    /**
-     * @param clusterId
-     * @param time
-     * @return
-     */
-    boolean deleteClustering(String clusterId, String time);
-
-    /**
-     * @param clusterId
-     * @param time
-     * @param flag      yes is ignore, no is not ignore
-     * @return
-     */
-    boolean igoreClustering(String clusterId, String time, String flag);
 }

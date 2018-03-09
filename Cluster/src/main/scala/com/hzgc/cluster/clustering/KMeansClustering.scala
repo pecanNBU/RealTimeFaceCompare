@@ -1,9 +1,12 @@
 package com.hzgc.cluster.clustering
 
 import java.sql.Timestamp
+import java.text.SimpleDateFormat
 import java.util
-import java.util.{Calendar, Properties}
+import java.util.{Calendar, Date, Properties}
 
+import com.hzgc.cluster.clustering.KMeansClustering2.LOG
+import com.hzgc.cluster.consumer.PutDataToEs
 import com.hzgc.cluster.util.PropertiesUtils
 import com.hzgc.dubbo.clustering.ClusteringAttribute
 import org.apache.log4j.Logger
@@ -18,8 +21,8 @@ object KMeansClustering {
   case class Data(id: Long, time: Timestamp, ipc: String, host: String, spic: String, bpic: String)
 
   val LOG: Logger = Logger.getLogger(KMeansClustering.getClass)
-  val numClusters = 50
-  val numIterations = 100000
+  val numClusters = 30
+  val numIterations = 10000
   var clusterIndex: Int = 0
 
 
@@ -62,10 +65,10 @@ object KMeansClustering {
     val joinData = spark.sql("select T1.feature, T2.* from parquetTable as T1 inner join mysqlTable as T2 on T1.ftpurl=T2.spic")
 
     val idPointRDD = joinData.rdd.map(data => (data.getAs[String]("spic"), Vectors.dense(data.getAs[mutable.WrappedArray[Float]]("feature").toArray.map(_.toDouble)))).cache()
-    val kMeansModel = KMeans.train(idPointRDD.map(_._2).sample(withReplacement = false, 0.4), numClusters, numIterations)
+    val kMeansModel = KMeans.train(idPointRDD.map(data => data._2).sample(withReplacement = false,0.5), numClusters, numIterations)
     val trainMidResult = kMeansModel.predict(idPointRDD.map(_._2))
-    // TODO: 删除 map(data => (data._1, data._2.toList.sortWith((a, b) => a.getTimestamp(1).getTime > b.getTimestamp(1).getTime)))
-    var trainResult = trainMidResult.zip(joinData.select("id", "time", "ipc", "host", "spic", "bpic").rdd)
+    val viewData = joinData.select("id", "time", "ipc", "host", "spic", "bpic").rdd
+    var trainResult = trainMidResult.zip(viewData)
       .groupByKey()
       .sortByKey()
       .map(data => (data._1, data._2.toArray.sortWith((a, b) => a.getTimestamp(1).getTime > b.getTimestamp(1).getTime)))
@@ -75,10 +78,10 @@ object KMeansClustering {
       val attribute = new ClusteringAttribute()
       attribute.setClusteringId(data._1.toString)
       attribute.setCount(data._2.length)
-      attribute.setFirstAppearTime(data._2(0).getTimestamp(1).toString)
-      attribute.setFirstIpcId(data._2(0).getAs[String]("ipc"))
-      attribute.setLastAppearTime(data._2(data._2.length - 1).getTimestamp(1).toString)
-      attribute.setLastIpcId(data._2(data._2.length - 1).getAs[String]("ipc"))
+      attribute.setLastAppearTime(data._2(0).getTimestamp(1).toString)
+      attribute.setLastIpcId(data._2(0).getAs[String]("ipc"))
+      attribute.setFirstAppearTime(data._2(data._2.length - 1).getTimestamp(1).toString)
+      attribute.setFirstIpcId(data._2(data._2.length - 1).getAs[String]("ipc"))
       attribute.setFtpUrl(data._2(data._2.length / 2).getAs[String]("spic"))
       attribute
     }).collect().foreach(data => table1List.add(data))
@@ -94,7 +97,7 @@ object KMeansClustering {
     LOG.info("write clustering info to HBase...")
     PutDataToHBase.putClusteringInfo(yearMon, table1List)
 
-    trainResult.foreach(data => {
+    /*trainResult.foreach(data => {
       val rowKey = yearMon + "-" + data._1
       println(rowKey)
       val idList = new util.ArrayList[Integer]()
@@ -102,6 +105,20 @@ object KMeansClustering {
       println(idList)
       println("++++++++++++++++++++++")
       PutDataToHBase.putDetailInfo_v1(rowKey, idList)
+    })*/
+    val sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+    val putDataToEs = PutDataToEs.getInstance()
+    trainResult.foreach(data => {
+      val rowKey = yearMon + "-" + data._1
+      println(rowKey)
+      data._2.foreach(data => {
+        val date = new Date(data.getAs[Timestamp]("time").getTime)
+        val dateNew = sdf.format(date)
+        val status = putDataToEs.upDateDataToEs(data.getAs[String]("spic"), rowKey, dateNew, data.getAs[Long]("id").toInt)
+        if (status != 200) {
+          LOG.info("Put data to es failed! And the failed ftpurl is " + data.getAs("spic"))
+        }
+      })
     })
     spark.stop()
   }

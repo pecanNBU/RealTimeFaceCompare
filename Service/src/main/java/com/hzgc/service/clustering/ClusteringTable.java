@@ -18,4 +18,5 @@ public class ClusteringTable {
     public static final byte[] DETAILINFO_COLUMNFAMILY = Bytes.toBytes("c");
     //告警详细信息
     public static final byte[] DETAILINFO_COLUMN_DATA = Bytes.toBytes("i");
+
 }

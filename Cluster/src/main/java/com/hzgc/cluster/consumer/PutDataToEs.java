@@ -4,9 +4,6 @@ import com.hzgc.dubbo.feature.FaceAttribute;
 import com.hzgc.ftpserver.producer.FaceObject;
 import com.hzgc.service.dynamicrepo.DynamicTable;
 import com.hzgc.service.staticrepo.ElasticSearchHelper;
-import org.elasticsearch.action.bulk.BulkRequest;
-import org.elasticsearch.action.bulk.BulkRequestBuilder;
-import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.rest.RestStatus;
@@ -68,14 +65,14 @@ public class PutDataToEs implements Serializable {
         }
     }
 
-    public int upDateDataToEs(String ftpurl, String cluserId, String alarmTime, int alarmId) {
+    public int upDateDataToEs(String ftpurl, String clusteringId, String alarmTime, int alarmId) {
         UpdateResponse updateResponse = new UpdateResponse();
         Map<String, Object> map = new HashMap<>();
-        map.put("alarmid", alarmId);
-        map.put("alarm_time", alarmTime);
-        map.put("clusterid", cluserId);
+        map.put(DynamicTable.ALARM_ID, alarmId);
+        map.put(DynamicTable.ALARM_TIME, alarmTime);
+        map.put(DynamicTable.CLUSTERING_ID, clusteringId);
         if (ftpurl != null) {
-            updateResponse = ElasticSearchHelper.getEsClient().prepareUpdate("dynamic_temp",
+            updateResponse = ElasticSearchHelper.getEsClient().prepareUpdate(DynamicTable.DYNAMIC_INDEX,
                     DynamicTable.PERSON_INDEX_TYPE, ftpurl).setDoc(map).get();
         }
         if (updateResponse.status().getStatus() == 200) {

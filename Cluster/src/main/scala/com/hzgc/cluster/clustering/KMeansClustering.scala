@@ -21,7 +21,7 @@ object KMeansClustering {
   case class Data(id: Long, time: Timestamp, ipc: String, host: String, spic: String, bpic: String)
 
   val LOG: Logger = Logger.getLogger(KMeansClustering.getClass)
-  val numClusters = 30
+  val numClusters = 11
   val numIterations = 10000
   var clusterIndex: Int = 0
 

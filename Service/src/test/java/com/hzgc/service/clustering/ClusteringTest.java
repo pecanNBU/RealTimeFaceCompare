@@ -47,7 +47,7 @@ public class ClusteringTest {
         System.out.println(clusteringAttributeList.get(0).getClusteringId());
 
 
-        List<Integer> blist = new java.util.ArrayList<>();
+       /* List<Integer> blist = new java.util.ArrayList<>();
         blist.add(1);
         blist.add(10);
         blist.add(13);
@@ -62,8 +62,8 @@ public class ClusteringTest {
             if (blist.contains(i)){
                 clusteringAttributeList2.add(clusteringAttributeList.get(i));
             }
-        }
-        putDataToHBase("2018-02", clusteringAttributeList2);
+        }*/
+        putDataToHBase("2018-02-bak", new ArrayList<>(clusteringAttributeList));
        /* List<ClusteringAttribute> clusteringAttributeList2 = new ArrayList<>();
         clusteringAttributeList2.addAll(clusteringAttributeList1);
         putDataToHBase("2018-02", clusteringAttributeList2);*/

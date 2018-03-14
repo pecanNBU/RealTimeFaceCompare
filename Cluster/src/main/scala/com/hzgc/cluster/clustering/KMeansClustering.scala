@@ -55,7 +55,6 @@ object KMeansClustering {
 
     val preSql = "(select T1.id, T2.host_name, T2.big_picture_url, T2.small_picture_url, T1.alarm_time " + "from t_alarm_record as T1 inner join t_alarm_record_extra as T2 on T1.id=T2.record_id " + "where T2.static_id IS NULL " + "and DATE_FORMAT(T1.alarm_time,'%Y-%m') like " + currentYearMon + ") as temp"
 
-    sqlProper.setProperty("driver", driverClass)
     val dataSource = spark.read.jdbc(url, preSql, sqlProper)
     dataSource.map(data => {
       println("ftp://" + data.getAs[String](hostField) + ":2121/" + data.getAs[String](spicField))
@@ -64,38 +63,69 @@ object KMeansClustering {
 
     val joinData = spark.sql("select T1.feature, T2.* from parquetTable as T1 inner join mysqlTable as T2 on T1.ftpurl=T2.spic")
 
-    val idPointRDD = joinData.rdd.map(data => (data.getAs[String]("spic"), Vectors.dense(data.getAs[mutable.WrappedArray[Float]]("feature").toArray.map(_.toDouble)))).cache()
-    val kMeansModel = KMeans.train(idPointRDD.map(data => data._2).sample(withReplacement = false,0.5), numClusters, numIterations)
-    val trainMidResult = kMeansModel.predict(idPointRDD.map(_._2))
-    val viewData = joinData.select("id", "time", "ipc", "host", "spic", "bpic").rdd
-    var trainResult = trainMidResult.zip(viewData)
-      .groupByKey()
-      .sortByKey()
-      .map(data => (data._1, data._2.toArray.sortWith((a, b) => a.getTimestamp(1).getTime > b.getTimestamp(1).getTime)))
+    val idPointRDD = joinData.rdd.map(data =>
+      (data.getAs[String]("spic"),
+        Vectors.dense(data.getAs[mutable.WrappedArray[Float]]("feature")
+          .toArray.map(_.toDouble))))
+      .cache()
 
-    val table1List = new util.ArrayList[ClusteringAttribute]()
-    trainResult.map(data => {
-      val attribute = new ClusteringAttribute()
-      attribute.setClusteringId(data._1.toString)
-      attribute.setCount(data._2.length)
-      attribute.setLastAppearTime(data._2(0).getTimestamp(1).toString)
-      attribute.setLastIpcId(data._2(0).getAs[String]("ipc"))
-      attribute.setFirstAppearTime(data._2(data._2.length - 1).getTimestamp(1).toString)
-      attribute.setFirstIpcId(data._2(data._2.length - 1).getAs[String]("ipc"))
-      attribute.setFtpUrl(data._2(data._2.length / 2).getAs[String]("spic"))
-      attribute
-    }).collect().foreach(data => table1List.add(data))
-
-    val mon = calendar.get(Calendar.MONTH)
-    var monStr = ""
-    if (mon < 10) {
-      monStr = "0" + mon
-    } else {
-      monStr = String.valueOf(mon)
+    /*val trainData = idPointRDD.map(_._2)
+    val numData = trainData.count()
+    val i = 0
+    val k_wsseMap = new mutable.HashMap[Int, Double]()
+    var max_K = math.sqrt(numData).toInt
+    for (i <- 1 to max_K) {
+      var numClusters = i
+      val kMeansModel = KMeans.train(trainData, numClusters, numIterations)
+      val trainMidResult = kMeansModel.predict(idPointRDD.map(_._2))
+      val wsse = kMeansModel.computeCost(trainData)
+      k_wsseMap.put(numClusters, wsse)
     }
-    val yearMon = calendar.get(Calendar.YEAR) + "-" + monStr
-    LOG.info("write clustering info to HBase...")
-    PutDataToHBase.putClusteringInfo(yearMon, table1List)
+    val a = (k_wsseMap(max_K) - k_wsseMap(1)) / (max_K - 1)
+    val b = (max_K * k_wsseMap(1) - k_wsseMap(max_K)) / (max_K - 1)
+    println("k_wsseMap(1):" + k_wsseMap(1))
+    println("k_wsseMap(max_k):" + k_wsseMap(max_K))
+    println("max_K:" + max_K)
+    println("a:" + a)
+    println("b:" + b)
+    spark.sparkContext.broadcast(a)
+    spark.sparkContext.broadcast(b)
+    val dist = new util.ArrayList[Double]()
+    k_wsseMap.foreach(println(_))
+    val distMap = k_wsseMap.map(data =>
+      (data._1, math.abs((a * data._1 - data._2 + b)) / math.sqrt(math.pow(a, 2) + 1))).foreach(println(_))*/
+
+    val kMeansModel = KMeans.train(idPointRDD.map(data => data._2), numClusters, numIterations)
+      val trainMidResult = kMeansModel.predict(idPointRDD.map(_._2))
+      val viewData = joinData.select("id", "time", "ipc", "host", "spic", "bpic").rdd
+      var trainResult = trainMidResult.zip(viewData)
+        .groupByKey()
+        .sortByKey()
+        .map(data => (data._1, data._2.toArray.sortWith((a, b) => a.getTimestamp(1).getTime > b.getTimestamp(1).getTime)))
+
+      val table1List = new util.ArrayList[ClusteringAttribute]()
+      trainResult.map(data => {
+        val attribute = new ClusteringAttribute()
+        attribute.setClusteringId(data._1.toString)
+        attribute.setCount(data._2.length)
+        attribute.setLastAppearTime(data._2(0).getTimestamp(1).toString)
+        attribute.setLastIpcId(data._2(0).getAs[String]("ipc"))
+        attribute.setFirstAppearTime(data._2(data._2.length - 1).getTimestamp(1).toString)
+        attribute.setFirstIpcId(data._2(data._2.length - 1).getAs[String]("ipc"))
+        attribute.setFtpUrl(data._2(data._2.length / 2).getAs[String]("spic"))
+        attribute
+      }).collect().foreach(data => table1List.add(data))
+
+      val mon = calendar.get(Calendar.MONTH)
+      var monStr = ""
+      if (mon < 10) {
+        monStr = "0" + mon
+      } else {
+        monStr = String.valueOf(mon)
+      }
+      val yearMon = calendar.get(Calendar.YEAR) + "-" + monStr
+      LOG.info("write clustering info to HBase...")
+      PutDataToHBase.putClusteringInfo(yearMon, table1List)
 
     /*trainResult.foreach(data => {
       val rowKey = yearMon + "-" + data._1
@@ -106,20 +136,22 @@ object KMeansClustering {
       println("++++++++++++++++++++++")
       PutDataToHBase.putDetailInfo_v1(rowKey, idList)
     })*/
-    val sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
-    val putDataToEs = PutDataToEs.getInstance()
-    trainResult.foreach(data => {
-      val rowKey = yearMon + "-" + data._1
-      println(rowKey)
-      data._2.foreach(data => {
-        val date = new Date(data.getAs[Timestamp]("time").getTime)
-        val dateNew = sdf.format(date)
-        val status = putDataToEs.upDateDataToEs(data.getAs[String]("spic"), rowKey, dateNew, data.getAs[Long]("id").toInt)
-        if (status != 200) {
-          LOG.info("Put data to es failed! And the failed ftpurl is " + data.getAs("spic"))
-        }
-      })
-    })
+
+
+     val sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+     val putDataToEs = PutDataToEs.getInstance()
+     trainResult.foreach(data => {
+       val rowKey = yearMon + "-" + data._1
+       println(rowKey)
+       data._2.foreach(data => {
+         val date = new Date(data.getAs[Timestamp]("time").getTime)
+         val dateNew = sdf.format(date)
+         val status = putDataToEs.upDateDataToEs(data.getAs[String]("spic"), rowKey, dateNew, data.getAs[Long]("id").toInt)
+         if (status != 200) {
+           LOG.info("Put data to es failed! And the failed ftpurl is " + data.getAs("spic"))
+         }
+       })
+     })
     spark.stop()
   }
 }

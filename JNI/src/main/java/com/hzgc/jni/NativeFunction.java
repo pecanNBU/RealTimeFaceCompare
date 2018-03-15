@@ -20,6 +20,16 @@ public class NativeFunction implements Serializable {
 
     public static native float compare(float[] currentFeature, float[] historyFeature);
 
+    public static native void cublas_create();
+
+    public static native void cu_malloc1();
+
+    public static native float[] compare_gpu(int m, int n, int k, float[] javaData1, float[] javaData2);
+
+    public static native void cu_free1();
+
+    public static native void cublas_destroy();
+
     static {
         System.loadLibrary("FaceLib");
     }

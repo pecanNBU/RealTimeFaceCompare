@@ -125,7 +125,7 @@ object KMeansClustering {
     val predictResult = point_center_dist.zip(viewData).groupBy(key => key._1._1).mapValues(f => {
       f.toList.filter(data => data._1._2 > similarityThreshold).sortWith((a, b) => (a._1._2 < b._1._2))
     })
-      //.filter(data => data._2.length > appearCount)
+    //.filter(data => data._2.length > appearCount)
     val table1List = new util.ArrayList[ClusteringAttribute]()
     val uuidString = UUID.randomUUID().toString
 
@@ -140,8 +140,9 @@ object KMeansClustering {
        .foreach(println(_))
 
      val indexed = IndexedRDD(predictResult).cache()*/
-    predictResult.sortByKey().collect().foreach(println(_))
+    predictResult.map(data => (data._1, data._2)).sortByKey().collect().foreach(println(_))
     val indexedResult = IndexedRDD(predictResult).cache()
+    indexedResult.get(10)
 
     /*val iter_center = union_center.keySet().iterator()
     while (iter_center.hasNext) {
@@ -194,7 +195,7 @@ object KMeansClustering {
         }
       })
     }) */
-      spark.stop()
+    spark.stop()
   }
 
   def cosineMeasure(v1: Array[Double], v2: Array[Double]): Double = {

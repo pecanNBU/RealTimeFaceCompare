@@ -141,8 +141,7 @@ object KMeansClustering {
 
      val indexed = IndexedRDD(predictResult).cache()*/
     predictResult.map(data => (data._1, data._2)).sortByKey().collect().foreach(println(_))
-    val indexedResult = IndexedRDD(predictResult).cache()
-    indexedResult.get(10)
+
 
     /*val iter_center = union_center.keySet().iterator()
     while (iter_center.hasNext) {

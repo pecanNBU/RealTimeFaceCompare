@@ -29,7 +29,8 @@ object KMeansClustering {
   val numClusters = 50
   val numIterations = 100000
   var clusterIndex: Int = 0
-  val similarityThreshold = 0.90
+  val similarityThreshold = 0.93
+  val center_similarityThreshold = 0.90
   val appearCount = 10
 
   def main(args: Array[String]) {
@@ -51,7 +52,7 @@ object KMeansClustering {
     val bpicField = properties.getProperty("job.clustering.mysql.field.bpic")
     val partitionNum = properties.getProperty("job.clustering.partiton.number").toInt
 
-    val spark = SparkSession.builder().appName(appName).enableHiveSupport().master("local[*]").getOrCreate()
+    val spark = SparkSession.builder().appName(appName).master("local[2]").enableHiveSupport().getOrCreate()
     import spark.implicits._
 
     val calendar = Calendar.getInstance()
@@ -77,20 +78,63 @@ object KMeansClustering {
     }).createOrReplaceTempView("mysqlTable")
 
     val joinData = spark.sql("select T1.feature, T2.* from parquetTable as T1 inner join mysqlTable as T2 on T1.ftpurl=T2.spic")
-
+    //prepare data
     val idPointRDD = joinData.rdd.map(data =>
       (data.getAs[String]("spic"),
         Vectors.dense(data.getAs[mutable.WrappedArray[Float]]("feature")
           .toArray.map(_.toDouble))))
       .cache()
-    val centerList = new util.ArrayList[CenterData]()
+    //train the model
     val kMeansModel = KMeans.train(idPointRDD.map(data => data._2), numClusters, numIterations)
-    kMeansModel.clusterCenters.foreach(x => {
-      println("Center Point of Cluster" + clusterIndex + ":")
-      println(x)
-      centerList.add(new CenterData(clusterIndex, x.toArray))
-      clusterIndex += 1
+
+    /* //get the centerList
+     val centerList = new util.ArrayList[CenterData]()
+     kMeansModel.clusterCenters.foreach(x => {
+       println("Center Point of Cluster" + clusterIndex + ":")
+       println(x)
+       centerList.add(new CenterData(clusterIndex, x.toArray))
+       clusterIndex += 1
+     })
+     //compare each two center points and merge it when the similarity is larger than the threshold
+     val centerListTmp = new util.ArrayList[CenterData]()
+     centerListTmp.addAll(centerList)
+     val deleteCenter = new util.ArrayList[Int]()
+     val union_center = new util.HashMap[Int, ArrayBuffer[Int]]
+     for (i <- 0 to centerListTmp.size() - 1) {
+       val first = centerListTmp.get(i)
+       if (!deleteCenter.contains(first.num)) {
+         val centerSimilarity = ArrayBuffer[Int]()
+         val iter = centerList.iterator()
+         while (iter.hasNext) {
+           val second = iter.next()
+           val pairSim = cosineMeasure(first.data, second.data)
+           if (pairSim > center_similarityThreshold) {
+             deleteCenter.add(second.num)
+             centerSimilarity += second.num
+             iter.remove()
+           }
+         }
+         union_center.put(first.num, centerSimilarity)
+       }
+     }
+ */
+    //predict each point belong to which clustering center and filter by similarityThreshold
+    val dataCenter = idPointRDD.map(_._2).map(p => (kMeansModel.predict(p), kMeansModel.clusterCenters.apply(kMeansModel.predict(p)), p))
+    val zipDataCenter = dataCenter.zip(idPointRDD.map(_._2))
+    val point_center_dist = zipDataCenter.map(data => (data._1._1, cosineMeasure(data._1._2.toArray, data._2.toArray)))
+    val viewData = joinData.select("id", "time", "ipc", "host", "spic", "bpic", "feature").rdd
+    val predictResult = point_center_dist.zip(viewData).groupBy(key => key._1._1).mapValues(f => {
+      f.toList.filter(data => data._1._2 > similarityThreshold).sortWith((a, b) => (a._1._2 > b._1._2))
+    }).filter(data => data._2.length > 0).sortByKey()
+
+    //get the top simialarity point of each clustering
+    val topPoint_center = predictResult.map(data => (data._1, data._2.apply(0)._2.getAs[mutable.WrappedArray[Float]]("feature").toArray.map(_.toDouble)))
+    //get the top point of each clustering
+    val centerList = new util.ArrayList[CenterData]()
+    topPoint_center.foreach(x => {
+      centerList.add(new CenterData(x._1, x._2))
     })
+    //compare each two center points and merge it when the similarity is larger than the threshold
     val centerListTmp = new util.ArrayList[CenterData]()
     centerListTmp.addAll(centerList)
     val deleteCenter = new util.ArrayList[Int]()
@@ -103,7 +147,7 @@ object KMeansClustering {
         while (iter.hasNext) {
           val second = iter.next()
           val pairSim = cosineMeasure(first.data, second.data)
-          if (pairSim > similarityThreshold) {
+          if (pairSim > center_similarityThreshold) {
             deleteCenter.add(second.num)
             centerSimilarity += second.num
             iter.remove()
@@ -112,92 +156,83 @@ object KMeansClustering {
         union_center.put(first.num, centerSimilarity)
       }
     }
-
-
-    val dataCenter = idPointRDD.map(_._2).map(p => (kMeansModel.predict(p), kMeansModel.clusterCenters.apply(kMeansModel.predict(p)), p))
-
-    val zipDataCenter = dataCenter.zip(idPointRDD.map(_._2))
-    val point_center_dist = zipDataCenter.map(data => (data._1._1, cosineMeasure(data._1._2.toArray, data._2.toArray)))
-    val viewData = joinData.select("id", "time", "ipc", "host", "spic", "bpic", "feature").rdd
-    val predictResult = point_center_dist.zip(viewData).groupBy(key => key._1._1).mapValues(f => {
-      f.toList.filter(data => data._1._2 > similarityThreshold).sortWith((a, b) => (a._1._2 < b._1._2))
-    })
     //.filter(data => data._2.length > appearCount)
-    /*  val table1List = new util.ArrayList[ClusteringAttribute]()
-      val uuidString = UUID.randomUUID().toString
+    /* val center_Point_map = mutable.HashMap[Int, mutable.WrappedArray[Float]]()
+    val firstImgRDD = predictResult.map(data =>
+      (data._1, data._2(0)._2.getAs[mutable.WrappedArray[Float]]("feature")))
 
-      val center_Point_map = mutable.HashMap[Int, mutable.WrappedArray[Float]]()
-      val firstImgRDD = predictResult.map(data =>
-        (data._1, data._2(0)._2.getAs[mutable.WrappedArray[Float]]("feature")))
-
-      val zip_firstImgRDD = firstImgRDD.zipWithIndex()
-      val join_zipedfirstImgRDD = zip_firstImgRDD.cartesian(zip_firstImgRDD).filter(f => f._1._2 < f._2._2)
-      join_zipedfirstImgRDD.map(data =>
-        (data._1._1._1, data._2._1._1, cosineMeasure(data._1._1._2.toArray.map(_.toDouble), data._2._1._2.toArray.map(_.toDouble))))
-        .foreach(println(_))*/
+    val zip_firstImgRDD = firstImgRDD.zipWithIndex()
+     val join_zipedfirstImgRDD = zip_firstImgRDD.cartesian(zip_firstImgRDD).filter(f => f._1._2 < f._2._2)
+     join_zipedfirstImgRDD.map(data =>
+       (data._1._1._1, data._2._1._1, cosineMeasure(data._1._1._2.toArray.map(_.toDouble), data._2._1._2.toArray.map(_.toDouble))))
+       .foreach(println(_))*/
 
     predictResult.map(data => (data._1, data._2)).sortByKey()
     val indexedResult = IndexedRDD(predictResult).cache()
-    println(indexedResult.get(10))
-
 
     val iter_center = union_center.keySet().iterator()
+    var indexed1 = indexedResult
     while (iter_center.hasNext) {
       val key = iter_center.next()
       val value = union_center.get(key)
-      for (i <- 0 until value.length) {
-        val first_list = indexedResult.get(key).get
-        val cluster_tmp = value(i)
-        if (cluster_tmp != key) {
-          val second_list = indexedResult.get(cluster_tmp).get
-          val indexLast = indexedResult.put(key, first_list.union(second_list))
+      if (value.length > 1) {
+        for (i <- 1 until value.length) {
+          val first_list = indexed1.get(key).get
+          val cluster_tmp = value(i)
           val arrayBuffer = ArrayBuffer[Int]()
-          arrayBuffer += cluster_tmp
-          val indexed1 = indexLast.delete(arrayBuffer.toArray)
+          if (cluster_tmp != key) {
+            val second_list = indexedResult.get(cluster_tmp).get
+            indexed1 = indexed1.put(key, first_list.union(second_list))
+            arrayBuffer += cluster_tmp
+            println(indexed1.count())
+          }
+          indexed1 = indexed1.delete(arrayBuffer.toArray)
           println(indexed1.count())
         }
       }
     }
-    val table1List = new util.ArrayList[ClusteringAttribute]()
-    val uuidString = UUID.randomUUID().toString
-    indexedResult.map(data => {
-      val attribute = new ClusteringAttribute()
-      attribute.setClusteringId(data._1.toString + uuidString)
-      attribute.setCount(data._2.length)
-      attribute.setLastAppearTime(data._2(0)._2.getTimestamp(1).toString)
-      attribute.setLastIpcId(data._2(0)._2.getAs[String]("ipc"))
-      attribute.setFirstAppearTime(data._2(data._2.length - 1)._2.getTimestamp(1).toString)
-      attribute.setFirstIpcId(data._2(data._2.length - 1)._2.getAs[String]("ipc"))
-      attribute.setFtpUrl(data._2(0)._2.getAs[String]("spic"))
-      attribute
-    }).collect().foreach(data => table1List.add(data))
+    println(indexed1.count())
+    //put all the clustering data to HBase
+    /* val table1List = new util.ArrayList[ClusteringAttribute]()
+     val uuidString = UUID.randomUUID().toString
+     indexed1.map(data => {
+       val attribute = new ClusteringAttribute()
+       attribute.setClusteringId(data._1.toString + uuidString)
+       attribute.setCount(data._2.length)
+       attribute.setLastAppearTime(data._2(0)._2.getTimestamp(1).toString)
+       attribute.setLastIpcId(data._2(0)._2.getAs[String]("ipc"))
+       attribute.setFirstAppearTime(data._2(data._2.length - 1)._2.getTimestamp(1).toString)
+       attribute.setFirstIpcId(data._2(data._2.length - 1)._2.getAs[String]("ipc"))
+       attribute.setFtpUrl(data._2(0)._2.getAs[String]("spic"))
+       attribute
+     }).collect().foreach(data => table1List.add(data))
 
-    val mon = calendar.get(Calendar.MONTH)
-    var monStr = ""
-    if (mon < 10) {
-      monStr = "0" + mon
-    } else {
-      monStr = String.valueOf(mon)
-    }
-    val yearMon = calendar.get(Calendar.YEAR) + "-" + monStr
-    LOG.info("write clustering info to HBase...")
-    PutDataToHBase.putClusteringInfo(yearMon, table1List)
+     val mon = calendar.get(Calendar.MONTH)
+     var monStr = ""
+     if (mon < 10) {
+       monStr = "0" + mon
+     } else {
+       monStr = String.valueOf(mon)
+     }
+     val yearMon = calendar.get(Calendar.YEAR) + "-" + monStr
+     LOG.info("write clustering info to HBase...")
+     PutDataToHBase.putClusteringInfo(yearMon, table1List)
 
-
-    val sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
-    val putDataToEs = PutDataToEs.getInstance()
-    indexedResult.foreach(data => {
-      val rowKey = yearMon + "-" + data._1 + uuidString
-      println(rowKey)
-      data._2.foreach(p => {
-        val date = new Date(p._2.getAs[Timestamp]("time").getTime)
-        val dateNew = sdf.format(date)
-        val status = putDataToEs.upDateDataToEs(p._2.getAs[String]("spic"), rowKey, dateNew, p._2.getAs[Long]("id").toInt)
-        if (status != 200) {
-          LOG.info("Put data to es failed! And the failed ftpurl is " + p._2.getAs("spic"))
-        }
-      })
-    })
+     //put each clustering data to es
+     val sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+     val putDataToEs = PutDataToEs.getInstance()
+     indexed1.foreach(data => {
+       val rowKey = yearMon + "-" + data._1 + uuidString
+       println(rowKey)
+       data._2.foreach(p => {
+         val date = new Date(p._2.getAs[Timestamp]("time").getTime)
+         val dateNew = sdf.format(date)
+         val status = putDataToEs.upDateDataToEs(p._2.getAs[String]("spic"), rowKey, dateNew, p._2.getAs[Long]("id").toInt)
+         if (status != 200) {
+           LOG.info("Put data to es failed! And the failed ftpurl is " + p._2.getAs("spic"))
+         }
+       })
+     })*/
     spark.stop()
   }
 

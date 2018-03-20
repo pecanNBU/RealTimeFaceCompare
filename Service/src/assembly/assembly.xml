@@ -19,11 +19,11 @@
             <includes>
                <include>**</include>
            </includes>
-            <includes>
-                <include>spring-context.xml</include>
-                <include>sql/**</include>
+            <excludes>
+                <exclude>spring-context.xml</exclude>
+                <exclude>sql/**</exclude>
                 <exclude>ftp-hostnames.properties</exclude>
-            </includes>
+            </excludes>
             <outputDirectory>conf</outputDirectory>
         </fileSet>
         <!--项目sql目录-->

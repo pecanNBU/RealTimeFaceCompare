@@ -25,6 +25,9 @@ object KMeansClustering {
 
   case class CenterData(num: Int, data: Array[Double])
 
+  //exception when write to es
+  System.setProperty("es.set.netty.runtime.available.processors", "false")
+
   val LOG: Logger = Logger.getLogger(KMeansClustering.getClass)
   val numClusters = 50
   val numIterations = 100000
@@ -52,7 +55,7 @@ object KMeansClustering {
     val bpicField = properties.getProperty("job.clustering.mysql.field.bpic")
     val partitionNum = properties.getProperty("job.clustering.partiton.number").toInt
 
-    val spark = SparkSession.builder().appName(appName).master("local[2]").enableHiveSupport().getOrCreate()
+    val spark = SparkSession.builder().appName(appName).master("local[*]").enableHiveSupport().getOrCreate()
     import spark.implicits._
 
     val calendar = Calendar.getInstance()
@@ -87,9 +90,8 @@ object KMeansClustering {
     region_ipcMap.foreach(println(_))
 
     var i = 0
-    for (i <- region_ipcMap)
-    {
-      val regoin = i._1
+    for (i <- region_ipcMap) {
+      val region = i._1
       val ipcList = i._2.split(",")
       val j = 0
       var ipcStr = ""
@@ -125,32 +127,35 @@ object KMeansClustering {
         f.toList.filter(data => data._1._2 > similarityThreshold).sortWith((a, b) => (a._1._2 > b._1._2))
       }).sortByKey().filter(data => data._2.length > 0)
 
+
+      val keyList = predictResult.map(data => data._1).collect().toList
+
       //get the top simialarity point of each clustering
-      val topPoint_center = predictResult.map(data => (data._1, data._2.apply(0)._2.getAs[mutable.WrappedArray[Float]]("feature")))
+      /*val topPoint_center = predictResult.map(data => (data._1, data._2.apply(0)._2.getAs[mutable.WrappedArray[Float]]("feature")))
       //get the top point of each clustering
       val centerList = new util.ArrayList[CenterData]()
-      topPoint_center.take(1).map(data => new CenterData(data._1, data._2.toArray.map(_.toDouble)))
       topPoint_center.foreach(x => {
         println(x._2)
         centerList.add(new CenterData(x._1, x._2.toArray.map(_.toDouble)))
-      })
+      })*/
 
 
       //get the centerList
-      /*val centerList = new util.ArrayList[CenterData]()
+      val centerList = new util.ArrayList[CenterData]()
       kMeansModel.clusterCenters.foreach(x => {
         println("Center Point of Cluster" + clusterIndex + ":")
         println(x)
         centerList.add(new CenterData(clusterIndex, x.toArray))
         clusterIndex += 1
-      })*/
+      })
       //compare each two center points and merge it when the similarity is larger than the threshold
       val centerListTmp = new util.ArrayList[CenterData]()
       centerListTmp.addAll(centerList)
       val deleteCenter = new util.ArrayList[Int]()
       val union_center = new util.HashMap[Int, ArrayBuffer[Int]]
-      for (i <- 0 to centerListTmp.size() - 1) {
-        val first = centerListTmp.get(i)
+      var k = 0
+      for (k <- 0 to centerListTmp.size() - 1) {
+        val first = centerListTmp.get(k)
         if (!deleteCenter.contains(first.num)) {
           val centerSimilarity = ArrayBuffer[Int]()
           val iter = centerList.iterator()
@@ -175,26 +180,29 @@ object KMeansClustering {
       var indexed1 = indexedResult
       while (iter_center.hasNext) {
         val key = iter_center.next()
-        val value = union_center.get(key)
-        if (value.length > 1) {
-          for (i <- 1 until value.length) {
-            val first_list = indexed1.get(key).get
-            val cluster_tmp = value(i)
-            val arrayBuffer = ArrayBuffer[Int]()
-            if (cluster_tmp != key) {
-              if (indexedResult.get(cluster_tmp) != null) {
-                val second_list = indexedResult.get(cluster_tmp).get
-                val topSim = cosineMeasure(first_list.apply(0)._2.getAs[mutable.WrappedArray[Float]]("feature").toArray.map(_.toDouble),
-                  second_list.apply(0)._2.getAs[mutable.WrappedArray[Float]]("feature").toArray.map(_.toDouble))
-                if (topSim > center_similarityThreshold) {
-                  indexed1 = indexed1.put(key, first_list.union(second_list))
-                  arrayBuffer += cluster_tmp
-                  println(indexed1.count())
+        if (keyList.contains(key)) {
+          val value = union_center.get(key)
+          if (value.length > 1) {
+            val first_list_option = indexed1.get(key) getOrElse (null)
+            if (first_list_option != null && first_list_option.size > 1) {
+              for (i <- 1 until value.length) {
+                val first_list = first_list_option
+                val cluster_tmp = value(i)
+                val arrayBuffer = ArrayBuffer[Int]()
+                val second_list = indexed1.get(cluster_tmp) getOrElse (null)
+                if (second_list != null && second_list.size > 1) {
+                  val topSim = cosineMeasure(first_list.apply(0)._2.getAs[mutable.WrappedArray[Float]]("feature").toArray.map(_.toDouble),
+                    second_list.apply(1)._2.getAs[mutable.WrappedArray[Float]]("feature").toArray.map(_.toDouble))
+                  if (topSim > center_similarityThreshold) {
+                    indexed1 = indexed1.put(key, first_list.union(second_list.drop(0)))
+                    arrayBuffer += cluster_tmp
+                    println(indexed1.count())
+                  }
                 }
+                indexed1 = indexed1.delete(arrayBuffer.toArray)
+                println(indexed1.count())
               }
             }
-            indexed1 = indexed1.delete(arrayBuffer.toArray)
-            println(indexed1.count())
           }
         }
       }
@@ -203,9 +211,10 @@ object KMeansClustering {
       //put all the clustering data to HBase
       val table1List = new util.ArrayList[ClusteringAttribute]()
       val uuidString = UUID.randomUUID().toString
-      indexed1.map(data => {
+      val lastResult = indexed1.filter(data => data._2.length > appearCount)
+      lastResult.map(data => {
         val attribute = new ClusteringAttribute()
-        attribute.setClusteringId(data._1.toString + uuidString)
+        attribute.setClusteringId(region + "-" + uuidString + "-" + data._1.toString)
         attribute.setCount(data._2.length)
         attribute.setLastAppearTime(data._2(0)._2.getTimestamp(1).toString)
         attribute.setLastIpcId(data._2(0)._2.getAs[String]("ipc"))
@@ -224,13 +233,13 @@ object KMeansClustering {
       }
       val yearMon = calendar.get(Calendar.YEAR) + "-" + monStr
       LOG.info("write clustering info to HBase...")
-      PutDataToHBase.putClusteringInfo(yearMon, table1List)
+      PutDataToHBase.putClusteringInfo(yearMon + "-" + region + "-" + uuidString, table1List)
 
       //put each clustering data to es
       val sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
       val putDataToEs = PutDataToEs.getInstance()
-      indexed1.foreach(data => {
-        val rowKey = yearMon + "-" + data._1 + uuidString
+      lastResult.foreach(data => {
+        val rowKey = yearMon + "-" + region + "-" + data._1 + "-" + uuidString
         println(rowKey)
         data._2.foreach(p => {
           val date = new Date(p._2.getAs[Timestamp]("time").getTime)

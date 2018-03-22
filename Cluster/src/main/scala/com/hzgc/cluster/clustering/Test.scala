@@ -8,12 +8,16 @@ object Test {
   def main(args: Array[String]): Unit = {
     val spark = SparkSession.builder().appName("test").master("local[2]").enableHiveSupport().getOrCreate()
     // Create an RDD of key-value pairs with Long keys.
-    val rdd = spark.sparkContext.parallelize((1 to 1000000).map(x => (x.toLong, 0)))
+    val rdd = spark.sparkContext.parallelize((1 to 100).map(x => (x, 0)))
     // Construct an IndexedRDD from the pairs, hash-partitioning and indexing
     // the entries.
     var indexed = IndexedRDD(rdd).cache()
-    indexed = indexed.put(1234L, 10873)
-    println(indexed.get(1234L))
+    indexed = indexed.put(100, 10873)
+    val array = new Array[Int](1)
+    array(0) = 99
+    indexed = indexed.delete(array)
+    println(indexed.get(100))
+    println(indexed.get(99))
     /*// Perform a point update.
     val indexed2 = indexed.put(1234L, 10873).cache()
     // Perform a point lookup. Note that the original IndexedRDD remains

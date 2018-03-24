@@ -47,7 +47,7 @@ public class ClusteringSearchServiceImpl implements ClusteringSearchService {
         List<ClusteringAttribute> clusteringList = new ArrayList<>();
         try {
             Result result = clusteringInfoTable.get(get);
-            clusteringList = (List<ClusteringAttribute>) ObjectUtil.byteToObject(result.getValue(ClusteringTable.ClUSTERINGINFO_COLUMNFAMILY, ClusteringTable.ClUSTERINGINFO_COLUMN_DATA));
+            clusteringList = (List<ClusteringAttribute>) ObjectUtil.byteToObject(result.getValue(ClusteringTable.ClUSTERINGINFO_COLUMNFAMILY, ClusteringTable.ClUSTERINGINFO_COLUMN_YES));
             if (sortParam != null && sortParam.length() > 0) {
                 SortParam sortParams = ListUtils.getOrderStringBySort(sortParam);
                 ListUtils.sort(clusteringList, sortParams.getSortNameArr(), sortParams.getIsAscArr());
@@ -87,7 +87,7 @@ public class ClusteringSearchServiceImpl implements ClusteringSearchService {
         List<AlarmInfo> alarmInfoList = new ArrayList<>();
         try {
             Result result = clusteringInfoTable.get(get);
-            alarmInfoList = (List<AlarmInfo>) ObjectUtil.byteToObject(result.getValue(ClusteringTable.ClUSTERINGINFO_COLUMNFAMILY, ClusteringTable.ClUSTERINGINFO_COLUMN_DATA));
+            alarmInfoList = (List<AlarmInfo>) ObjectUtil.byteToObject(result.getValue(ClusteringTable.ClUSTERINGINFO_COLUMNFAMILY, ClusteringTable.ClUSTERINGINFO_COLUMN_YES));
             if (sortParam != null && sortParam.length() > 0) {
                 SortParam sortParams = ListUtils.getOrderStringBySort(sortParam);
                 ListUtils.sort(alarmInfoList, sortParams.getSortNameArr(), sortParams.getIsAscArr());

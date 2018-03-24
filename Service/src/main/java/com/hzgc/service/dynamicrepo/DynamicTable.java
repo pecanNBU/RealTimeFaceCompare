@@ -40,7 +40,7 @@ public class DynamicTable implements Serializable {
     //查询信息
     static final byte[] SEARCHRES_COLUMN_SEARCHMESSAGE = Bytes.toBytes("m");
     //es索引
-    public static final String DYNAMIC_INDEX = "dynamic_temp";
+    public static final String DYNAMIC_INDEX = "dynamic";
     //es类型
     public static final String PERSON_INDEX_TYPE = "person";
     //图片的ftp地址 xxx/xxx/xxx/

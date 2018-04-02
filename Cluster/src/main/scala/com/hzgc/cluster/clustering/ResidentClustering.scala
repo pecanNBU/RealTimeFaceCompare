@@ -8,6 +8,7 @@ import java.util.{Calendar, Date, Properties, UUID}
 
 import com.hzgc.cluster.consumer.PutDataToEs
 import com.hzgc.cluster.util.PropertiesUtils
+import com.hzgc.collect.expand.util.FTPDownloadUtils
 import com.hzgc.dubbo.clustering.ClusteringAttribute
 import com.hzgc.jni.ClusteringFunction
 import org.apache.log4j.Logger
@@ -49,7 +50,7 @@ object ResidentClustering {
     import spark.implicits._
 
     val calendar = Calendar.getInstance()
-    val mon = calendar.get(Calendar.MONTH) + 1
+    val mon = calendar.get(Calendar.MONTH)
     val year = calendar.get(Calendar.YEAR)
     val resultFileName = year + "-" + mon + "-" + uuidString + ".txt"
     val currentYearMon = "'" + year + "-%" + mon + "%'"
@@ -89,7 +90,6 @@ object ResidentClustering {
         LOG.info("start clustering region" + finalStr)
 
         val joinData = spark.sql("select T2.*, T1.feature from parquetTable as T1 inner join mysqlTable as T2 on T1.ftpurl=T2.spic where T2.ipc in " + finalStr)
-
         //prepare data
         val idPointRDD = joinData.rdd.map(data => DataWithFeature(data.getAs[Long]("id"), data.getAs[Timestamp]("time"), data.getAs[String]("spic").split("/")(3), data.getAs[String]("host"), data.getAs[String]("spic"), data.getAs[String]("bpic"), data.getAs[mutable.WrappedArray[Float]]("feature").toArray)).persist(StorageLevel.MEMORY_AND_DISK_SER)
         val dataSize = idPointRDD.count().toInt

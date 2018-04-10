@@ -1,5 +1,6 @@
 package com.hzgc.service.clustering;
 
+import com.hzgc.dubbo.clustering.AlarmInfo;
 import com.hzgc.dubbo.clustering.ClusteringAttribute;
 import com.hzgc.dubbo.clustering.ClusteringInfo;
 import com.hzgc.service.util.HBaseHelper;
@@ -45,6 +46,8 @@ public class ClusteringTest {
         List<ClusteringAttribute> clusteringAttributeList = clusteringInfo.getClusteringAttributeList();
         System.out.println(clusteringAttributeList.get(0).getCount());
         System.out.println(clusteringAttributeList.get(0).getClusteringId());
+        List<Integer> alarmInfos = clusteringSearchService.detailClusteringSearch_v1("1-2-86f45457-8357-405d-94bd-98744b320b06", "2018-02", 0, 100, "");
+        System.out.println(alarmInfos.size());
 
 
        /* List<Integer> blist = new java.util.ArrayList<>();

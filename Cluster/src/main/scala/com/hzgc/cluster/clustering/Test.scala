@@ -7,7 +7,7 @@ import org.apache.spark.sql.SparkSession
 
 object Test {
   def main(args: Array[String]): Unit = {
-    println(ClusteringFunction.clusteringComputer(new Array[Float](0),1,"test.txt","/opt"))
+
     println(System.getProperty("java.library.path"))
 
 
